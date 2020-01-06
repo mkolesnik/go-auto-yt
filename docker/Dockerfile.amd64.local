@@ -1,0 +1,22 @@
+#Transfer git content from DOWNLOAD stage over GO stage to build application
+FROM golang:alpine as GO
+WORKDIR /app
+COPY . .
+RUN GOOS=linux GOARCH=amd64 go build -o main .
+
+#Use ffmpeg as base image and copy executable from other temp images
+FROM jrottenberg/ffmpeg:alpine as BASE
+RUN apk --no-cache add curl python shadow
+RUN curl -L https://yt-dl.org/downloads/latest/youtube-dl -o /usr/local/bin/youtube-dl && chmod a+rx /usr/local/bin/youtube-dl
+WORKDIR /app
+COPY --from=GO /app/main /app/entrypoint.sh ./
+COPY --from=GO /app/static ./static
+RUN addgroup -S goautoyt \
+    && adduser --system goautoyt --ingroup goautoyt 
+
+#Set starting command
+ENTRYPOINT ["./entrypoint.sh"]
+
+#Expose port and volumes
+EXPOSE 8080
+VOLUME /app/downloads /app/config
